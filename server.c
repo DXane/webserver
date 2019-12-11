@@ -8,15 +8,13 @@
 #include <stdbool.h>
 
 //Preprocessor defines
-#define VERSION "0.1"
+#define VERSION "0.5"
 #define SERVERNAME "Hermes Team 09"
 #define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define MAX_LENGTH 200
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
-#define log(x) printf("%s\n",(char *)x)
-
 
 const size_t BUF_LEN = 1024;
 
@@ -45,22 +43,15 @@ int main(int argc, char **argv)
 	struct sockaddr_in server_addr, client_addr;
 	socklen_t addrLen = sizeof(struct sockaddr_in);
 	char revBuff[BUF_LEN];
-    char *head=NULL;
-    char *body=NULL;
 	//size_t len;
-    status_code code;
     
     // Check for right number of arguments
 	if ( argc < 2 ) usage( argv[0] );
-
-    set_code(&code,501);
-    create_header(&code,&head);
-
+    printf("Build %s Date: %s %s\n",VERSION,__DATE__,__TIME__);
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sockfd==-1){
-        printf("Socket Creation not successfull \n");
-        exit(-1);
+        sysErr("Socket Creation not successfull",-1);
 	}
 	else {
         printf("Socket created \n");
@@ -83,8 +74,7 @@ int main(int argc, char **argv)
 
 		// Wait for incoming TCP Connection Requests
 		if ( (listen(sockfd,10) ) !=0 ){
-            printf("Listen from Server failed \n");
-            exit(-1);
+            sysErr("Listen from Server failed",-1);
 		}
 		else{
             printf("Listening.... \n");
@@ -92,8 +82,7 @@ int main(int argc, char **argv)
         // Accepting a single connection on connfd
 		connfd = accept(sockfd,(struct sockaddr *) &client_addr, &addrLen);
 		if (connfd < 0){
-            printf("Server accept failed \n");
-            exit(-1);
+            sysErr("Server accept failed",-1);
 		}
 		else {
             printf("Connection Succesfull \n");
@@ -101,7 +90,7 @@ int main(int argc, char **argv)
         }
 
         // Sending back the Message unchanged
-		printf("Send Response\n");
+		//printf("Send Response\n");
         /*
 		if(write( connfd, head, strlen(head) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
@@ -110,14 +99,14 @@ int main(int argc, char **argv)
         if(write( connfd, body, strlen(body) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 		}
-        printf("Send Body\n");*/
+        printf("Send Body\n");
+        */
 		// Closes currently accepted connection
+        printf("Close Connection");
 		close(connfd);
 	}
 
 	close( sockfd );
-    free(head);
-    free(body);
 	exit(0);
 }
 
@@ -136,22 +125,21 @@ int process_Request(int socket)
 
     line=0;
     // Reading a Message from the Client
-    while ((len > 0) && strcmp("\n", revBuff)) {
+    do {
         len = get_line(socket, revBuff, BUF_LEN-1);
         printf("%s",revBuff);
 
         //Only check at the First Line
         if( line == 0 ){
             token = strtok( revBuff , delimiter );
-            log(token);
             while( token != NULL ) {
                 if( strncmp( token , "GET" , 3 ) == 0 ) {
                     token = strtok( NULL , delimiter);
                     strcpy(resource,token);
-                    log(resource);
-                    send_File(resource,socket,&code);
+                    send_File(token,socket,&code);
+                    token = NULL;
                     //send_OK(&code,head,socket);
-                    return 0;
+                    //return 0;
                 }
                 else{
                     send_Error(&code,head,socket);
@@ -161,7 +149,7 @@ int process_Request(int socket)
             line++;
         }
         
-    }
+    }while(((len > 0) && strcmp("\n", revBuff)));
     return 0;
 }
 
@@ -175,21 +163,19 @@ int send_File(char *filename,int socket, status_code *code)
 
     chdir(HTML_FILES_PATH);
     strcat(file,filename);
-    log(file);
     fp = fopen(file,"r+");
     if(fp==NULL || errno==EISDIR){
-        log("2");
         send_404(code,socket);
         return 1;
     }
     else{
         send_OK(code,socket);
         fgets(text,200,fp);
-        log(text);
         if(write( socket, text, strlen(text) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 		}
         fclose(fp);
+        free(file);
     }
     return 0;
 }
