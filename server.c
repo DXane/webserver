@@ -7,12 +7,16 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+//Preprocessor defines
 #define VERSION "0.1"
-#define DATE "Mon, 11 Dec 2069 20:04:20 UTC+1"
-#define SERVERNAME "Hermes (Unix)"
-#define HTTP_HEADER "HTTP/1.0 %i %s\r\nDATE: %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
-#define HTTP_BODY "<html><body><b>%i</b> %s </body></html>\r\n"
+#define SERVERNAME "Hermes Team 09"
+#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
+#define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define MAX_LENGTH 200
+#define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
+#define HTML_FILES_PATH "./html/"
+#define log(x) printf("%s\n",(char *)x)
+
 
 const size_t BUF_LEN = 1024;
 
@@ -21,38 +25,19 @@ typedef struct http_code{
     char *reason;
 } status_code;
 
+//Functionsprototypes
 int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
+int process_Request(int socket);
+int send_File(char *filename,int socket,status_code *code);
+void create_header(status_code* code,char** header);
+void send_OK(status_code* code,int sock);
+void send_Error(status_code* code,char* header,int sock);
+void send_404(status_code *code, int sock);
+void usage( char *argv0 );
+void sysErr( char *msg, int exitCode );
 
-void create_header(status_code* code,char** header)
-{
-    //Get Size of formated Header String and allocate the needed Memoryspace
-    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,DATE,SERVERNAME,VERSION)+2;
-    *header=(char*)malloc(len*sizeof(char));
-    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,DATE,SERVERNAME,VERSION);
-}
-
-void create_body(status_code* code,char** body){
-    int len;
-    //Get Size of formated Body String and allocate the needed Memoryspace
-    len=snprintf(NULL,0,HTTP_BODY,code->number,code->reason);
-    *body=(char*)malloc(len*sizeof(char));
-    snprintf(*body,MAX_LENGTH,HTTP_BODY,code->number,code->reason);
-}
-// Something unexpected happened. Report error and terminate.
-void sysErr( char *msg, int exitCode )
-{
-	fprintf( stderr, "%s\n\t%s\n", msg, strerror( errno ) );
-	exit( exitCode );
-}
-
-// The user entered something stupid. Tell him.
-void usage( char *argv0 )
-{
-	printf( "usage : %s portnumber\n", argv0 );
-	exit( 0 );
-}
-
+//Main Program
 int main(int argc, char **argv)
 {
     // Setup for all used variables
@@ -62,13 +47,15 @@ int main(int argc, char **argv)
 	char revBuff[BUF_LEN];
     char *head=NULL;
     char *body=NULL;
-	size_t len;
+	//size_t len;
     status_code code;
     
+    // Check for right number of arguments
+	if ( argc < 2 ) usage( argv[0] );
 
     set_code(&code,501);
     create_header(&code,&head);
-    create_body(&code,&body);
+
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sockfd==-1){
@@ -84,10 +71,8 @@ int main(int argc, char **argv)
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	server_addr.sin_port = htons( (u_short)atoi(argv[1] ) );
 
-	// Check for right number of arguments
-	if ( argc < 2 ) usage( argv[0] );
 
-
+    printf("Binding\n");
 	// Binding the created Socket to the Server
 	if ( bind( sockfd, (struct sockaddr *) &server_addr, addrLen ) == -1 ) {
 		sysErr( "Server Fault : BIND", -2 );
@@ -112,17 +97,12 @@ int main(int argc, char **argv)
 		}
 		else {
             printf("Connection Succesfull \n");
-		}
-
-        // Reading a Message from the Client
-		while ((len > 0) && strcmp("\n", revBuff)) {
-			len = get_line(connfd, revBuff, BUF_LEN-1);
-			printf("%s",revBuff);
-		}
+            process_Request(connfd);
+        }
 
         // Sending back the Message unchanged
 		printf("Send Response\n");
-        
+        /*
 		if(write( connfd, head, strlen(head) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 		}
@@ -130,7 +110,7 @@ int main(int argc, char **argv)
         if(write( connfd, body, strlen(body) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 		}
-        printf("Send Body\n");
+        printf("Send Body\n");*/
 		// Closes currently accepted connection
 		close(connfd);
 	}
@@ -139,6 +119,126 @@ int main(int argc, char **argv)
     free(head);
     free(body);
 	exit(0);
+}
+
+//Function Definition
+
+int process_Request(int socket)
+{
+    size_t len;
+    int line;
+    char revBuff[BUF_LEN];
+    char *head=NULL;
+    char delimiter[2]=" ";
+    char *token;
+    char resource[50];
+    status_code code={0,NULL};
+
+    line=0;
+    // Reading a Message from the Client
+    while ((len > 0) && strcmp("\n", revBuff)) {
+        len = get_line(socket, revBuff, BUF_LEN-1);
+        printf("%s",revBuff);
+
+        //Only check at the First Line
+        if( line == 0 ){
+            token = strtok( revBuff , delimiter );
+            log(token);
+            while( token != NULL ) {
+                if( strncmp( token , "GET" , 3 ) == 0 ) {
+                    token = strtok( NULL , delimiter);
+                    strcpy(resource,token);
+                    log(resource);
+                    send_File(resource,socket,&code);
+                    //send_OK(&code,head,socket);
+                    return 0;
+                }
+                else{
+                    send_Error(&code,head,socket);
+                    return 1;
+                }
+            }
+            line++;
+        }
+        
+    }
+    return 0;
+}
+
+int send_File(char *filename,int socket, status_code *code)
+{
+    FILE *fp;
+    char text[201];
+    char *file;
+    file=(char *)malloc(strlen(filename)*sizeof(char)+1);
+    file[0]='.';
+
+    chdir(HTML_FILES_PATH);
+    strcat(file,filename);
+    log(file);
+    fp = fopen(file,"r+");
+    if(fp==NULL || errno==EISDIR){
+        log("2");
+        send_404(code,socket);
+        return 1;
+    }
+    else{
+        send_OK(code,socket);
+        fgets(text,200,fp);
+        log(text);
+        if(write( socket, text, strlen(text) ) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+		}
+        fclose(fp);
+    }
+    return 0;
+}
+
+void create_header(status_code* code,char** header)
+{
+    //Get Size of formated Header String and allocate the needed Memoryspace
+    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION)+2;
+    *header=(char*)malloc(len*sizeof(char));
+    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
+}
+
+void send_OK(status_code* code,int sock)
+{
+    char *header;
+    set_code(code,200);
+    create_header(code,&header);
+    if(write( sock, header, strlen(header)) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+	}
+}
+
+void send_Error(status_code* code,char* header,int sock)
+{
+    set_code(code,501);
+    create_header(code,&header);
+    if(write( sock, header, strlen(header)) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+	}
+    if(write( sock, HTTP_BODY, strlen(HTTP_BODY) ) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+	}
+}
+
+void send_404(status_code* code,int sock)
+{
+    char *header;
+    set_code(code,404);
+    create_header(code,&header);
+    if(write( sock, header, strlen(header)) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+	}
+}
+
+// The user entered something stupid. Tell him.
+void usage( char *argv0 )
+{
+	printf( "usage : %s portnumber\n", argv0 );
+	exit( 0 );
 }
 
 int get_line(int sock, char *buf, int size)
@@ -170,6 +270,13 @@ int get_line(int sock, char *buf, int size)
     }
     buf[i] = '\0';
     return(i);
+}
+
+// Something unexpected happened. Report error and terminate.
+void sysErr( char *msg, int exitCode )
+{
+	fprintf( stderr, "%s\n\t%s\n", msg, strerror( errno ) );
+	exit( exitCode );
 }
 
 int set_code(status_code* error, int number)
