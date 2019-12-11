@@ -7,8 +7,13 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+#define VERSION "0.1"
+#define DATE "Mon, 11 Dec 2069 20:04:20 UTC+1"
+#define SERVERNAME "Hermes (Unix)"
+#define HTTP_HEADER "HTTP/1.0 %i %s\r\nDATE: %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
+#define HTTP_BODY "<html><body><b>%i</b> %s </body></html>\r\n"
+#define MAX_LENGTH 200
 
-const char error_501[138]="HTTP/1.0 501 Not Implemented\r\nContent-type: text/html\r\n\r\n""<html><body><b>501</b> Operation not supported</body></html>\r\n";
 const size_t BUF_LEN = 1024;
 
 typedef struct http_code{
@@ -18,6 +23,22 @@ typedef struct http_code{
 
 int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
+
+void create_header(status_code* code,char** header)
+{
+    //Get Size of formated Header String and allocate the needed Memoryspace
+    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,DATE,SERVERNAME,VERSION)+2;
+    *header=(char*)malloc(len*sizeof(char));
+    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,DATE,SERVERNAME,VERSION);
+}
+
+void create_body(status_code* code,char** body){
+    int len;
+    //Get Size of formated Body String and allocate the needed Memoryspace
+    len=snprintf(NULL,0,HTTP_BODY,code->number,code->reason);
+    *body=(char*)malloc(len*sizeof(char));
+    snprintf(*body,MAX_LENGTH,HTTP_BODY,code->number,code->reason);
+}
 // Something unexpected happened. Report error and terminate.
 void sysErr( char *msg, int exitCode )
 {
@@ -39,9 +60,15 @@ int main(int argc, char **argv)
 	struct sockaddr_in server_addr, client_addr;
 	socklen_t addrLen = sizeof(struct sockaddr_in);
 	char revBuff[BUF_LEN];
+    char *head=NULL;
+    char *body=NULL;
 	size_t len;
     status_code code;
     
+
+    set_code(&code,501);
+    create_header(&code,&head);
+    create_body(&code,&body);
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sockfd==-1){
@@ -65,7 +92,7 @@ int main(int argc, char **argv)
 	if ( bind( sockfd, (struct sockaddr *) &server_addr, addrLen ) == -1 ) {
 		sysErr( "Server Fault : BIND", -2 );
 	}
-    
+
 	while ( true ) {
 		memset(revBuff, 0, BUF_LEN);
 
@@ -95,14 +122,22 @@ int main(int argc, char **argv)
 
         // Sending back the Message unchanged
 		printf("Send Response\n");
-		if(write( connfd, error_501, strlen(error_501) ) ==-1 ){
+        
+		if(write( connfd, head, strlen(head) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 		}
+        printf("Send Head\n");
+        if(write( connfd, body, strlen(body) ) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+		}
+        printf("Send Body\n");
 		// Closes currently accepted connection
 		close(connfd);
 	}
 
 	close( sockfd );
+    free(head);
+    free(body);
 	exit(0);
 }
 
@@ -212,7 +247,7 @@ int set_code(status_code* error, int number)
 
 	case 503:
 		error->number = 503;
-		error->reason = "Service Unavailabl";
+		error->reason = "Service Unavailable";
 		break;
 		
 	default:

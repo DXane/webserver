@@ -13,6 +13,7 @@ An HTTP 1.0 Server for a Project
    - [ ] 4xx Codes
    - [ ] 5xx Codes
       - [x] 501
-- [ ] Status Codes
+- [x] Status Codes
 - [ ] Parallelisierung
 - [ ] Schöner Code schreiben
+- [x] Automatische Header und Body Generation
