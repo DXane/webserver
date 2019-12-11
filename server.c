@@ -11,8 +11,13 @@
 const char error_501[138]="HTTP/1.0 501 Not Implemented\r\nContent-type: text/html\r\n\r\n""<html><body><b>501</b> Operation not supported</body></html>\r\n";
 const size_t BUF_LEN = 1024;
 
-int get_line(int sock, char *buf, int size);
+typedef struct http_code{
+    int number;
+    char *reason;
+} status_code;
 
+int get_line(int sock, char *buf, int size);
+int set_code(status_code* error, int number);
 // Something unexpected happened. Report error and terminate.
 void sysErr( char *msg, int exitCode )
 {
@@ -35,7 +40,8 @@ int main(int argc, char **argv)
 	socklen_t addrLen = sizeof(struct sockaddr_in);
 	char revBuff[BUF_LEN];
 	size_t len;
-
+    status_code code;
+    
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sockfd==-1){
@@ -59,7 +65,7 @@ int main(int argc, char **argv)
 	if ( bind( sockfd, (struct sockaddr *) &server_addr, addrLen ) == -1 ) {
 		sysErr( "Server Fault : BIND", -2 );
 	}
-
+    
 	while ( true ) {
 		memset(revBuff, 0, BUF_LEN);
 
@@ -129,4 +135,89 @@ int get_line(int sock, char *buf, int size)
     }
     buf[i] = '\0';
     return(i);
+}
+
+int set_code(status_code* error, int number)
+{
+	switch (number) {
+	case 200:
+		error->number = 200;
+		error->reason = "OK";
+		break;
+
+	case 201:
+		error->number = 201;
+		error->reason = "Created";
+		break;
+
+	case 202:
+		error->number = 202;
+		error->reason = "Accepted";
+		break;
+
+	case 204:
+		error->number = 204;
+		error->reason = "No Content";
+		break;
+
+	case 301:
+		error->number = 301;
+		error->reason = "Moved Permanently";
+		break;
+
+	case 302:
+		error->number = 302;
+		error->reason = "Moved Temporarily";
+		break;
+
+	case 304:
+		error->number = 304;
+		error->reason = "Not Modified";
+		break;
+
+	case 400:
+		error->number = 400;
+		error->reason = "Bad Request";
+		break;
+
+	case 401:
+		error->number = 401;
+		error->reason = "Unauthorized";
+		break;
+
+	case 403:
+		error->number = 403;
+		error->reason = "Forbidden";
+		break;
+
+	case 404:
+		error->number = 404;
+		error->reason = "Not Found";
+		break;
+
+	case 500:
+		error->number = 500;
+		error->reason = "Internal Server Error";
+		break;
+
+	case 501:
+		error->number = 501;
+		error->reason = "Not Implemented";
+		break;
+		
+	case 502:
+		error->number = 502;
+		error->reason = "Bad Gateway";
+		break;
+
+	case 503:
+		error->number = 503;
+		error->reason = "Service Unavailabl";
+		break;
+		
+	default:
+		return -1;
+	}
+	return 0;
+	
 }
