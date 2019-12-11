@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdbool.h>
 
 //Preprocessor defines
@@ -12,6 +13,7 @@
 #define SERVERNAME "Hermes Team 09"
 #define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
+#define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
 #define MAX_LENGTH 200
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
@@ -43,8 +45,9 @@ int main(int argc, char **argv)
 	struct sockaddr_in server_addr, client_addr;
 	socklen_t addrLen = sizeof(struct sockaddr_in);
 	char revBuff[BUF_LEN];
+    pid_t id;
 	//size_t len;
-    
+
     // Check for right number of arguments
 	if ( argc < 2 ) usage( argv[0] );
     printf("Build %s Date: %s %s\n",VERSION,__DATE__,__TIME__);
@@ -68,7 +71,7 @@ int main(int argc, char **argv)
 	if ( bind( sockfd, (struct sockaddr *) &server_addr, addrLen ) == -1 ) {
 		sysErr( "Server Fault : BIND", -2 );
 	}
-
+    signal(SIGCHLD, SIG_IGN);
 	while ( true ) {
 		memset(revBuff, 0, BUF_LEN);
 
@@ -81,29 +84,35 @@ int main(int argc, char **argv)
 		}
         // Accepting a single connection on connfd
 		connfd = accept(sockfd,(struct sockaddr *) &client_addr, &addrLen);
-		if (connfd < 0){
-            sysErr("Server accept failed",-1);
-		}
-		else {
-            printf("Connection Succesfull \n");
-            process_Request(connfd);
+        id=fork();
+        if(id==-1){
+            sysErr("Fork failed",-5);
         }
+        else if(id==0){
+            if (connfd < 0){
+                sysErr("Server accept failed",-1);
+            }
+            else {
+                printf("Connection Succesfull \n");
+                process_Request(connfd);
+            }
 
-        // Sending back the Message unchanged
-		//printf("Send Response\n");
-        /*
-		if(write( connfd, head, strlen(head) ) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-		}
-        printf("Send Head\n");
-        if(write( connfd, body, strlen(body) ) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-		}
-        printf("Send Body\n");
-        */
-		// Closes currently accepted connection
-        printf("Close Connection");
-		close(connfd);
+            // Sending back the Message unchanged
+            //printf("Send Response\n");
+            /*
+            if(write( connfd, head, strlen(head) ) ==-1 ){
+                sysErr("Server Fault: SENDTO", -4);
+            }
+            printf("Send Head\n");
+            if(write( connfd, body, strlen(body) ) ==-1 ){
+                sysErr("Server Fault: SENDTO", -4);
+            }
+            printf("Send Body\n");
+            */
+            // Closes currently accepted connection
+            printf("Close Connection");
+            close(connfd);
+        }
 	}
 
 	close( sockfd );
@@ -216,6 +225,9 @@ void send_404(status_code* code,int sock)
     set_code(code,404);
     create_header(code,&header);
     if(write( sock, header, strlen(header)) ==-1 ){
+            sysErr("Server Fault: SENDTO", -4);
+	}
+    if(write( sock, HTTP_404, strlen(HTTP_404) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 	}
 }
