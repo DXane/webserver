@@ -11,7 +11,7 @@
 //Preprocessor defines
 #define VERSION "0.5"
 #define SERVERNAME "Hermes Team 09"
-#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n"
+#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
 #define MAX_LENGTH 200
@@ -31,6 +31,7 @@ int set_code(status_code* error, int number);
 int process_Request(int socket);
 int send_File(char *filename,int socket,status_code *code);
 void create_header(status_code* code,char** header);
+void create_header_404(status_code* code,char** header);
 void send_OK(status_code* code,int sock);
 void send_Error(status_code* code,char* header,int sock);
 void send_404(status_code *code, int sock);
@@ -85,10 +86,12 @@ int main(int argc, char **argv)
         // Accepting a single connection on connfd
 		connfd = accept(sockfd,(struct sockaddr *) &client_addr, &addrLen);
         id=fork();
+        //id=0;
         if(id==-1){
             sysErr("Fork failed",-5);
         }
         else if(id==0){
+            //printf("Fork succesfull");
             if (connfd < 0){
                 sysErr("Server accept failed",-1);
             }
@@ -97,22 +100,11 @@ int main(int argc, char **argv)
                 process_Request(connfd);
             }
 
-            // Sending back the Message unchanged
-            //printf("Send Response\n");
-            /*
-            if(write( connfd, head, strlen(head) ) ==-1 ){
-                sysErr("Server Fault: SENDTO", -4);
-            }
-            printf("Send Head\n");
-            if(write( connfd, body, strlen(body) ) ==-1 ){
-                sysErr("Server Fault: SENDTO", -4);
-            }
-            printf("Send Body\n");
-            */
-            // Closes currently accepted connection
-            printf("Close Connection");
+            printf("Close Connection\n");
             close(connfd);
+            //exit(0);
         }
+        close(connfd);
 	}
 
 	close( sockfd );
@@ -175,14 +167,16 @@ int send_File(char *filename,int socket, status_code *code)
     fp = fopen(file,"r+");
     if(fp==NULL || errno==EISDIR){
         send_404(code,socket);
+        free(file);
         return 1;
     }
     else{
         send_OK(code,socket);
-        fgets(text,200,fp);
-        if(write( socket, text, strlen(text) ) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-		}
+        while(fgets(text,200,fp)!=NULL){   
+            if(write( socket, text, strlen(text) ) ==-1 ){
+                sysErr("Server Fault: SENDTO", -4);
+		    }
+        }
         fclose(fp);
         free(file);
     }
