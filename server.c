@@ -46,7 +46,11 @@ int main(int argc, char **argv)
 	struct sockaddr_in server_addr, client_addr;
 	socklen_t addrLen = sizeof(struct sockaddr_in);
 	char revBuff[BUF_LEN];
+    char str[INET_ADDRSTRLEN];
     pid_t id;
+    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&client_addr;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
 	//size_t len;
 
     // Check for right number of arguments
@@ -96,13 +100,13 @@ int main(int argc, char **argv)
                 sysErr("Server accept failed",-1);
             }
             else {
-                printf("Connection Succesfull \n");
+                printf("Connection Succesfull IP:%s\n",str);
                 process_Request(connfd);
             }
 
             printf("Close Connection\n");
             close(connfd);
-            //exit(0);
+            exit(0);
         }
         close(connfd);
 	}
