@@ -17,27 +17,26 @@
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
 
-const size_t BUF_LEN = 1024;
+//Maximum possible size for requests
+const size_t BUF_LEN = 8192;
 
+// Struct for creation of HTTP headers
 typedef struct http_code{
     int number;
     char *reason;
 } status_code;
 
-//Functionsprototypes
+//Function prototypes
 int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
 int process_Request(int socket);
 int send_File(char *filename,int socket,status_code *code);
 void create_header(status_code* code,char** header);
-void create_header_404(status_code* code,char** header);
-void send_OK(status_code* code,int sock);
-void send_Error(status_code* code,char* header,int sock);
-void send_404(status_code *code, int sock);
+void send_status(int statuscode,status_code * code, int sock);
 void usage( char *argv0 );
 void sysErr( char *msg, int exitCode );
 
-//Main Program
+//Main program
 int main(int argc, char **argv)
 {
     // Setup for all used variables
@@ -49,11 +48,11 @@ int main(int argc, char **argv)
     struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&client_addr;
     struct in_addr ipAddr = pV4Addr->sin_addr;
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
-	//size_t len;
 
     // Check for right number of arguments
 	if ( argc < 2 ) usage( argv[0] );
     printf("Build %s Date: %s %s\n",VERSION,__DATE__,__TIME__);
+
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sockfd==-1){
@@ -62,44 +61,50 @@ int main(int argc, char **argv)
 	else {
         printf("Socket created \n");
 	}
-	// Initialization of Server Struct with port and address
+
+	// Initialization of server struct with port and address
 	bzero(&server_addr,addrLen);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	server_addr.sin_port = htons( (u_short)atoi(argv[1] ) );
 
-
+	// Binding the created socket to the server
     printf("Binding\n");
-	// Binding the created Socket to the Server
 	if ( bind( sockfd, (struct sockaddr *) &server_addr, addrLen ) == -1 ) {
 		sysErr( "Server Fault : BIND", -2 );
 	}
+
+    // Preparing while loop and creation of child processes
     signal(SIGCHLD, SIG_IGN);
 	while ( true ) {
-		// Wait for incoming TCP Connection Requests
+
+		// Wait for incoming TCP connection requests
 		if ( (listen(sockfd,10) ) !=0 ){
             sysErr("Listen from Server failed",-1);
 		}
 		else{
             printf("Listening.... \n");
 		}
+
         // Accepting a single connection on connfd
 		connfd = accept(sockfd,(struct sockaddr *) &client_addr, &addrLen);
         id=fork();
-        //id=0;
+
+        //Child process executes the requested connection code so the main process can accept the next request
         if(id==-1){
             sysErr("Fork failed",-5);
         }
         else if(id==0){
-            //printf("Fork succesfull");
             if (connfd < 0){
                 sysErr("Server accept failed",-1);
             }
             else {
                 printf("Connection Succesfull IP:%s\n",str);
+
+                // Processing the current request
                 process_Request(connfd);
             }
-
+            // Close conection
             printf("Close Connection\n");
             close(connfd);
             exit(0);
@@ -111,68 +116,81 @@ int main(int argc, char **argv)
 	exit(0);
 }
 
-//Function Definition
-
+//Function Implementations
 int process_Request(int socket)
 {
+    // Declaration of used variables in this function
     size_t len;
     int line;
     char revBuff[BUF_LEN];
-    char *head=NULL;
     char delimiter[2]=" ";
     char *token;
-    char resource[50];
     status_code code={0,NULL};
 
     line=0;
-    // Reading a Message from the Client
+
+    // Reading a message from the client
     do {
         len = get_line(socket, revBuff, BUF_LEN-1);
         printf("%s",revBuff);
 
-        //Only check at the First Line
+        //Only check at the first line
         if( line == 0 ){
             token = strtok( revBuff , delimiter );
             while( token != NULL ) {
+
+                // Check for get request
                 if( strncmp( token , "GET" , 3 ) == 0 ) {
                     token = strtok( NULL , delimiter);
-                    strcpy(resource,token);
+
+                    // Start function to send the requested file to the client
                     send_File(token,socket,&code);
                     token = NULL;
                 }
                 else{
-                    send_Error(&code,head,socket);
+                    // Else send not implemented error
+                    send_status(501,&code,socket);
                     return 1;
                 }
             }
             line++;
         }
+        
     }while(((len > 0) && strcmp("\n", revBuff)));
     return 0;
 }
 
 int send_File(char *filename,int socket, status_code *code)
 {
+    // Declaration of used variables in this function
     FILE *fp;
     char text[201];
     char *file;
     file=(char *)malloc(strlen(filename)*sizeof(char)+1);
     file[0]='.';
+
+    // Check if the requested file wants to escape the designated area
     if(strstr(filename,"..")!=NULL){
-    	send_404(code,socket);
+        send_status(404,code,socket);
 	free(file);
 	return 1;
     }
+
+    // Change to direotory of the stored files
     chdir(HTML_FILES_PATH);
     strcat(file,filename);
     fp = fopen(file,"r+");
+
+    // Check if the requested file exists
+    // If not send error
     if(fp==NULL || errno==EISDIR){
-        send_404(code,socket);
+        send_status(404,code,socket);
         free(file);
         return 1;
     }
+    // Else send the requested file
     else{
-        send_OK(code,socket);
+        send_status(200,code,socket);
         while(fgets(text,200,fp)!=NULL){   
             if(write( socket, text, strlen(text) ) ==-1 ){
                 sysErr("Server Fault: SENDTO", -4);
@@ -186,39 +204,31 @@ int send_File(char *filename,int socket, status_code *code)
 
 void create_header(status_code* code,char** header)
 {
-    //Get Size of formated Header String and allocate the needed Memoryspace
+    //Get Size of formated header string and allocate the needed Memoryspace
     int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION)+2;
     *header=(char*)malloc(len*sizeof(char));
     snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
 }
 
-void send_OK(status_code* code,int sock)
-{
+void send_status(int statuscode,status_code* code, int sock){
+    // Send the corresponding error as a header
     char *header;
-    set_code(code,200);
+    set_code(code,statuscode);
     create_header(code,&header);
-    if(write( sock, header, strlen(header)) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-	}
-}
-
-void send_Error(status_code* code,char* header,int sock)
-{
-    set_code(code,501);
-    create_header(code,&header);
-    if(write( sock, header, strlen(header)) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-	}
-}
-
-void send_404(status_code* code,int sock)
-{
-    char *header;
-    set_code(code,404);
-    create_header(code,&header);
-    if(write( sock, header, strlen(header)) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-	}
+    if(write( sock, header, strlen(header))==-1){
+        sysErr("Server Fault: SENDTO",-4);
+    }
+    // Individual pages for better visibility of the send error
+    if(statuscode ==501){
+        if(write(sock,HTTP_BODY,strlen(HTTP_BODY)) ==-1){
+            sysErr("Server Fault: SENDTO",-4);
+        }
+    }
+    if(statuscode ==404){
+        if(write(sock,HTTP_404,strlen(HTTP_404)) ==-1){
+            sysErr("Server Fault: SENDTO",-4);
+        }
+    }
 }
 
 // The user entered something stupid. Tell him.
@@ -233,7 +243,7 @@ int get_line(int sock, char *buf, int size)
     int i = 0;
     char c = '\0';
     int n;
-    
+    // Reads the send in HTTP request
     while ((i < size - 1) && (c != '\n'))
     {
         n = recv(sock, &c, 1, 0);
