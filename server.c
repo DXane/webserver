@@ -14,7 +14,6 @@
 #define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
-#define MAX_LENGTH 200
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
 
@@ -45,7 +44,6 @@ int main(int argc, char **argv)
 	int connfd, sockfd;
 	struct sockaddr_in server_addr, client_addr;
 	socklen_t addrLen = sizeof(struct sockaddr_in);
-	char revBuff[BUF_LEN];
     char str[INET_ADDRSTRLEN];
     pid_t id;
     struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&client_addr;
@@ -78,8 +76,6 @@ int main(int argc, char **argv)
 	}
     signal(SIGCHLD, SIG_IGN);
 	while ( true ) {
-		memset(revBuff, 0, BUF_LEN);
-
 		// Wait for incoming TCP Connection Requests
 		if ( (listen(sockfd,10) ) !=0 ){
             sysErr("Listen from Server failed",-1);
@@ -143,8 +139,6 @@ int process_Request(int socket)
                     strcpy(resource,token);
                     send_File(token,socket,&code);
                     token = NULL;
-                    //send_OK(&code,head,socket);
-                    //return 0;
                 }
                 else{
                     send_Error(&code,head,socket);
@@ -153,7 +147,6 @@ int process_Request(int socket)
             }
             line++;
         }
-        
     }while(((len > 0) && strcmp("\n", revBuff)));
     return 0;
 }
@@ -165,7 +158,11 @@ int send_File(char *filename,int socket, status_code *code)
     char *file;
     file=(char *)malloc(strlen(filename)*sizeof(char)+1);
     file[0]='.';
-
+    if(strstr(filename,"..")!=NULL){
+    	send_404(code,socket);
+	free(file);
+	return 1;
+    }
     chdir(HTML_FILES_PATH);
     strcat(file,filename);
     fp = fopen(file,"r+");
@@ -212,9 +209,6 @@ void send_Error(status_code* code,char* header,int sock)
     if(write( sock, header, strlen(header)) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 	}
-    if(write( sock, HTTP_BODY, strlen(HTTP_BODY) ) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-	}
 }
 
 void send_404(status_code* code,int sock)
@@ -223,9 +217,6 @@ void send_404(status_code* code,int sock)
     set_code(code,404);
     create_header(code,&header);
     if(write( sock, header, strlen(header)) ==-1 ){
-            sysErr("Server Fault: SENDTO", -4);
-	}
-    if(write( sock, HTTP_404, strlen(HTTP_404) ) ==-1 ){
             sysErr("Server Fault: SENDTO", -4);
 	}
 }
