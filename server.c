@@ -125,7 +125,6 @@ int process_Request(int socket)
     char revBuff[BUF_LEN];
     char delimiter[2]=" ";
     char *token;
-    status_code code={0,NULL};
     int usedbuf;
     int flag;
     char reqfile[100];
