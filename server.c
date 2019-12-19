@@ -30,9 +30,9 @@ typedef struct http_code{
 int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
 int process_Request(int socket);
-int send_File(char *filename,int socket,status_code *code);
+int send_File(char *filename,int socket);
 void create_header(status_code* code,char** header);
-void send_status(int statuscode,status_code * code, int sock);
+void send_status(int statuscode, int sock);
 void usage( char *argv0 );
 void sysErr( char *msg, int exitCode );
 
@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	bzero(&server_addr,addrLen);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_addr.sin_port = htons( (u_short)atoi(argv[1] ) );
+	server_addr.sin_port = htons( (u_short) atoi (argv[1] ) );
 
 	// Binding the created socket to the server
     printf("Binding\n");
@@ -125,42 +125,54 @@ int process_Request(int socket)
     char revBuff[BUF_LEN];
     char delimiter[2]=" ";
     char *token;
-    status_code code={0,NULL};
-
+    int usedbuf;
+    int flag;
+    char recfile[50];
+    usedbuf=8192-1;
     line=0;
+    flag=0;
 
     // Reading a message from the client
     do {
         len = get_line(socket, revBuff, BUF_LEN-1);
+
+        // Check if the entire request exceeds he 8KB limit
+        usedbuf=usedbuf-len;
+        if (usedbuf <= 0){
+            send_status(400,socket);
+            return 1;
+        }
         printf("%s",revBuff);
 
         //Only check at the first line
         if( line == 0 ){
+
             token = strtok( revBuff , delimiter );
-            while( token != NULL ) {
-
-                // Check for get request
-                if( strncmp( token , "GET" , 3 ) == 0 ) {
-                    token = strtok( NULL , delimiter);
-
-                    // Start function to send the requested file to the client
-                    send_File(token,socket,&code);
-                    token = NULL;
-                }
-                else{
-                    // Else send not implemented error
-                    send_status(501,&code,socket);
-                    return 1;
-                }
+            // Check for get request
+            if( strncmp( token, "GET" , 3 ) == 0 ) {
+                token = strtok( NULL , delimiter);
+                strncpy(recfile,token,50);
+                flag=1;
+                // Start function to send the requested file to the client
+                //send_File(token,socket,&code);
+                // token = NULL;
             }
             line++;
         }
         
     }while(((len > 0) && strcmp("\n", revBuff)));
+
+    if(flag==1){
+        send_File(recfile,socket);
+    }
+    else{
+        send_status(501,socket);
+        return 1;
+    }
     return 0;
 }
 
-int send_File(char *filename,int socket, status_code *code)
+int send_File(char *filename,int socket)
 {
     // Declaration of used variables in this function
     FILE *fp;
@@ -171,9 +183,9 @@ int send_File(char *filename,int socket, status_code *code)
 
     // Check if the requested file wants to escape the designated area
     if(strstr(filename,"..")!=NULL){
-        send_status(404,code,socket);
-	free(file);
-	return 1;
+        send_status(404,socket);
+        free(file);
+        return 1;
     }
 
     // Change to direotory of the stored files
@@ -184,13 +196,13 @@ int send_File(char *filename,int socket, status_code *code)
     // Check if the requested file exists
     // If not send error
     if(fp==NULL || errno==EISDIR){
-        send_status(404,code,socket);
+        send_status(404,socket);
         free(file);
         return 1;
     }
     // Else send the requested file
     else{
-        send_status(200,code,socket);
+        send_status(200,socket);
         while(fgets(text,200,fp)!=NULL){   
             if(write( socket, text, strlen(text) ) ==-1 ){
                 sysErr("Server Fault: SENDTO", -4);
@@ -210,11 +222,12 @@ void create_header(status_code* code,char** header)
     snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
 }
 
-void send_status(int statuscode,status_code* code, int sock){
+void send_status(int statuscode, int sock){
     // Send the corresponding error as a header
     char *header;
-    set_code(code,statuscode);
-    create_header(code,&header);
+    status_code code;
+    set_code(&code,statuscode);
+    create_header(&code,&header);
     if(write( sock, header, strlen(header))==-1){
         sysErr("Server Fault: SENDTO",-4);
     }
