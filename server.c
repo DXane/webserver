@@ -18,7 +18,7 @@
 #define HTML_FILES_PATH "./html/"
 
 //Maximum possible size for requests
-const size_t BUF_LEN = 8192;
+const size_t BUF_LEN = 1024;
 
 // Struct for creation of HTTP headers
 typedef struct http_code{
@@ -124,10 +124,18 @@ int process_Request(int socket)
     int line;
     char revBuff[BUF_LEN];
     char delimiter[2]=" ";
+<<<<<<< HEAD
     char *token;
     int usedbuf;
     int flag;
     char recfile[50];
+=======
+    char *token[2];
+    status_code code={0,NULL};
+    int usedbuf;
+    int flag;
+
+>>>>>>> 878e7fd02dda1c7790b22f4d8d12718923dd59e8
     usedbuf=8192-1;
     line=0;
     flag=0;
@@ -139,7 +147,11 @@ int process_Request(int socket)
         // Check if the entire request exceeds he 8KB limit
         usedbuf=usedbuf-len;
         if (usedbuf <= 0){
+<<<<<<< HEAD
             send_status(400,socket);
+=======
+            send_status(400,&code,socket);
+>>>>>>> 878e7fd02dda1c7790b22f4d8d12718923dd59e8
             return 1;
         }
         printf("%s",revBuff);
@@ -147,6 +159,7 @@ int process_Request(int socket)
         //Only check at the first line
         if( line == 0 ){
 
+<<<<<<< HEAD
             token = strtok( revBuff , delimiter );
             // Check for get request
             if( strncmp( token, "GET" , 3 ) == 0 ) {
@@ -157,18 +170,40 @@ int process_Request(int socket)
                 //send_File(token,socket,&code);
                 // token = NULL;
             }
+=======
+            token[0] = strtok( revBuff , delimiter );
+
+                // Check for get request
+                if( strncmp( token[0] , "GET" , 3 ) == 0 ) {
+                    token[1] = strtok( NULL , delimiter);
+                    flag=1;
+                    // Start function to send the requested file to the client
+                    //send_File(token,socket,&code);
+                    // token = NULL;
+                }
+>>>>>>> 878e7fd02dda1c7790b22f4d8d12718923dd59e8
             line++;
         }
         
     }while(((len > 0) && strcmp("\n", revBuff)));
 
     if(flag==1){
+<<<<<<< HEAD
         send_File(recfile,socket);
     }
     else{
         send_status(501,socket);
         return 1;
     }
+=======
+        send_File(token[1],socket,&code);
+    }
+    else{
+        send_status(501,&code,socket);
+        return 1;
+    }
+
+>>>>>>> 878e7fd02dda1c7790b22f4d8d12718923dd59e8
     return 0;
 }
 
