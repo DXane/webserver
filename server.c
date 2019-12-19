@@ -163,7 +163,7 @@ int process_Request(int socket)
 
     // Start function to send the requested file to the client
     if(flag==1){
-        send_File(recfile,socket);
+        send_File(reqfile,socket);
     }
     //if there is no get request send 501
     else{
