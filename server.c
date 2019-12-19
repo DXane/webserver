@@ -18,7 +18,7 @@
 #define HTML_FILES_PATH "./html/"
 
 //Maximum possible size for requests
-const size_t BUF_LEN = 8192;
+const size_t BUF_LEN = 1024;
 
 // Struct for creation of HTTP headers
 typedef struct http_code{
@@ -124,39 +124,53 @@ int process_Request(int socket)
     int line;
     char revBuff[BUF_LEN];
     char delimiter[2]=" ";
-    char *token;
+    char *token[2];
     status_code code={0,NULL};
+    int usedbuf;
+    int flag;
 
+    usedbuf=8192-1;
     line=0;
+    flag=0;
 
     // Reading a message from the client
     do {
         len = get_line(socket, revBuff, BUF_LEN-1);
+
+        // Check if the entire request exceeds he 8KB limit
+        usedbuf=usedbuf-len;
+        if (usedbuf <= 0){
+            send_status(400,&code,socket);
+            return 1;
+        }
         printf("%s",revBuff);
 
         //Only check at the first line
         if( line == 0 ){
-            token = strtok( revBuff , delimiter );
-            while( token != NULL ) {
+
+            token[0] = strtok( revBuff , delimiter );
 
                 // Check for get request
-                if( strncmp( token , "GET" , 3 ) == 0 ) {
-                    token = strtok( NULL , delimiter);
-
+                if( strncmp( token[0] , "GET" , 3 ) == 0 ) {
+                    token[1] = strtok( NULL , delimiter);
+                    flag=1;
                     // Start function to send the requested file to the client
-                    send_File(token,socket,&code);
-                    token = NULL;
+                    //send_File(token,socket,&code);
+                    // token = NULL;
                 }
-                else{
-                    // Else send not implemented error
-                    send_status(501,&code,socket);
-                    return 1;
-                }
-            }
             line++;
         }
         
     }while(((len > 0) && strcmp("\n", revBuff)));
+
+    if(flag==1){
+        send_File(token[1],socket,&code);
+    }
+    else{
+        send_status(501,&code,socket);
+        return 1;
+    }
+
     return 0;
 }
 
