@@ -30,9 +30,9 @@ typedef struct http_code{
 int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
 int process_Request(int socket);
-int send_File(char *filename,int socket,status_code *code);
+int send_File(char *filename,int socket);
 void create_header(status_code* code,char** header);
-void send_status(int statuscode,status_code * code, int sock);
+void send_status(int statuscode, int sock);
 void usage( char *argv0 );
 void sysErr( char *msg, int exitCode );
 
@@ -124,11 +124,11 @@ int process_Request(int socket)
     int line;
     char revBuff[BUF_LEN];
     char delimiter[2]=" ";
-    char *token[2];
-    status_code code={0,NULL};
+    char *token;
     int usedbuf;
     int flag;
-
+    char reqfile[100];
+    
     usedbuf=8192-1;
     line=0;
     flag=0;
@@ -140,7 +140,7 @@ int process_Request(int socket)
         // Check if the entire request exceeds he 8KB limit
         usedbuf=usedbuf-len;
         if (usedbuf <= 0){
-            send_status(400,&code,socket);
+            send_status(400,socket);
             return 1;
         }
         printf("%s",revBuff);
@@ -148,33 +148,32 @@ int process_Request(int socket)
         //Only check at the first line
         if( line == 0 ){
 
-            token[0] = strtok( revBuff , delimiter );
-
-                // Check for get request
-                if( strncmp( token[0] , "GET" , 3 ) == 0 ) {
-                    token[1] = strtok( NULL , delimiter);
-                    flag=1;
-                    // Start function to send the requested file to the client
-                    //send_File(token,socket,&code);
-                    // token = NULL;
-                }
+            token = strtok( revBuff , delimiter );
+            // Check for get request
+            if( strncmp( token , "GET" , 3 ) == 0 ) {
+                token=strtok(NULL,delimiter);
+                flag=1;
+                strncpy(reqfile,token,100-1);
+            }
             line++;
         }
         
     }while(((len > 0) && strcmp("\n", revBuff)));
 
+    // Start function to send the requested file to the client
     if(flag==1){
-        send_File(token[1],socket,&code);
+        send_File(reqfile,socket);
     }
+    //if there is no get request send 501
     else{
-        send_status(501,&code,socket);
+        send_status(501,socket);
         return 1;
     }
 
     return 0;
 }
 
-int send_File(char *filename,int socket, status_code *code)
+int send_File(char *filename,int socket)
 {
     // Declaration of used variables in this function
     FILE *fp;
@@ -185,7 +184,7 @@ int send_File(char *filename,int socket, status_code *code)
 
     // Check if the requested file wants to escape the designated area
     if(strstr(filename,"..")!=NULL){
-        send_status(404,code,socket);
+        send_status(404,socket);
 	free(file);
 	return 1;
     }
@@ -198,13 +197,13 @@ int send_File(char *filename,int socket, status_code *code)
     // Check if the requested file exists
     // If not send error
     if(fp==NULL || errno==EISDIR){
-        send_status(404,code,socket);
+        send_status(404,socket);
         free(file);
         return 1;
     }
     // Else send the requested file
     else{
-        send_status(200,code,socket);
+        send_status(200,socket);
         while(fgets(text,200,fp)!=NULL){   
             if(write( socket, text, strlen(text) ) ==-1 ){
                 sysErr("Server Fault: SENDTO", -4);
@@ -224,11 +223,12 @@ void create_header(status_code* code,char** header)
     snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
 }
 
-void send_status(int statuscode,status_code* code, int sock){
+void send_status(int statuscode, int sock){
     // Send the corresponding error as a header
     char *header;
-    set_code(code,statuscode);
-    create_header(code,&header);
+    status_code code;
+    set_code(&code,statuscode);
+    create_header(&code,&header);
     if(write( sock, header, strlen(header))==-1){
         sysErr("Server Fault: SENDTO",-4);
     }
