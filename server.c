@@ -1,3 +1,6 @@
+//Authors:Daniel Förderer,Robert Schreiber
+//Last modified:07.01.2020
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -11,16 +14,15 @@
 //Preprocessor defines
 #define VERSION "0.5"
 #define SERVERNAME "Hermes Team 09"
-#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
 
-//Maximum possible size for requests
+//Maximum possible size for a single request line
 const size_t BUF_LEN = 1024;
 
-// Struct for creation of HTTP headers
+// Struct for creation of HTTP headers and code management
 typedef struct http_code{
     int number;
     char *reason;
@@ -28,7 +30,7 @@ typedef struct http_code{
 
 //Function prototypes
 int get_line(int sock, char *buf, int size);
-int set_code(status_code* error, int number);
+int set_code(status_code* code, int number);
 int process_Request(int socket);
 int send_File(char *filename,int socket);
 void create_header(status_code* code,char** header);
@@ -66,7 +68,7 @@ int main(int argc, char **argv)
 	bzero(&server_addr,addrLen);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_addr.sin_port = htons( (u_short)atoi(argv[1] ) );
+	server_addr.sin_port = htons( (u_short)atoi(argv[1]) );
 
 	// Binding the created socket to the server
     printf("Binding\n");
@@ -109,9 +111,10 @@ int main(int argc, char **argv)
             close(connfd);
             exit(0);
         }
+        //Parent close connection
         close(connfd);
 	}
-
+    //Close the opened socket
 	close( sockfd );
 	exit(0);
 }
@@ -135,9 +138,9 @@ int process_Request(int socket)
 
     // Reading a message from the client
     do {
-        len = get_line(socket, revBuff, BUF_LEN-1);
+        len = get_line(socket, revBuff, BUF_LEN);
 
-        // Check if the entire request exceeds he 8KB limit
+        // Check if the entire request exceeds the 8KB limit
         usedbuf=usedbuf-len;
         if (usedbuf <= 0){
             send_status(400,socket);
@@ -149,11 +152,11 @@ int process_Request(int socket)
         if( line == 0 ){
 
             token = strtok( revBuff , delimiter );
-            // Check for get request
+            // Check for get request and set corresponding flag
             if( strncmp( token , "GET" , 3 ) == 0 ) {
                 token=strtok(NULL,delimiter);
                 flag=1;
-                strncpy(reqfile,token,100-1);
+                strncpy(reqfile,token,strlen(token));
             }
             line++;
         }
@@ -183,13 +186,13 @@ int send_File(char *filename,int socket)
     file[0]='.';
 
     // Check if the requested file wants to escape the designated area
-    if(strstr(filename,"..")!=NULL){
+    if(strstr(filename,"/../")!=NULL){
         send_status(404,socket);
 	free(file);
 	return 1;
     }
 
-    // Change to direotory of the stored files
+    // Change to the directory of html stored files
     chdir(HTML_FILES_PATH);
     strcat(file,filename);
     fp = fopen(file,"r+");
@@ -209,6 +212,7 @@ int send_File(char *filename,int socket)
                 sysErr("Server Fault: SENDTO", -4);
 		    }
         }
+        //Close the opened file
         fclose(fp);
         free(file);
     }
@@ -218,9 +222,9 @@ int send_File(char *filename,int socket)
 void create_header(status_code* code,char** header)
 {
     //Get Size of formated header string and allocate the needed Memoryspace
-    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION)+2;
+    int len=snprintf(NULL,0,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION)+2;
     *header=(char*)malloc(len*sizeof(char));
-    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
+    snprintf(*header,len,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION);
 }
 
 void send_status(int statuscode, int sock){
@@ -252,6 +256,7 @@ void usage( char *argv0 )
 	exit( 0 );
 }
 
+//Reads a single line of content until it reaches a new line
 int get_line(int sock, char *buf, int size)
 {
     int i = 0;
@@ -289,83 +294,83 @@ void sysErr( char *msg, int exitCode )
 	fprintf( stderr, "%s\n\t%s\n", msg, strerror( errno ) );
 	exit( exitCode );
 }
-
-int set_code(status_code* error, int number)
+//Setup for filling the HTTP Response codes with corresponding values
+int set_code(status_code* code, int number)
 {
 	switch (number) {
 	case 200:
-		error->number = 200;
-		error->reason = "OK";
+		code->number = 200;
+		code->reason = "OK";
 		break;
 
 	case 201:
-		error->number = 201;
-		error->reason = "Created";
+		code->number = 201;
+		code->reason = "Created";
 		break;
 
 	case 202:
-		error->number = 202;
-		error->reason = "Accepted";
+		code->number = 202;
+		code->reason = "Accepted";
 		break;
 
 	case 204:
-		error->number = 204;
-		error->reason = "No Content";
+		code->number = 204;
+		code->reason = "No Content";
 		break;
 
 	case 301:
-		error->number = 301;
-		error->reason = "Moved Permanently";
+		code->number = 301;
+		code->reason = "Moved Permanently";
 		break;
 
 	case 302:
-		error->number = 302;
-		error->reason = "Moved Temporarily";
+		code->number = 302;
+		code->reason = "Moved Temporarily";
 		break;
 
 	case 304:
-		error->number = 304;
-		error->reason = "Not Modified";
+		code->number = 304;
+		code->reason = "Not Modified";
 		break;
 
 	case 400:
-		error->number = 400;
-		error->reason = "Bad Request";
+		code->number = 400;
+		code->reason = "Bad Request";
 		break;
 
 	case 401:
-		error->number = 401;
-		error->reason = "Unauthorized";
+		code->number = 401;
+		code->reason = "Unauthorized";
 		break;
 
 	case 403:
-		error->number = 403;
-		error->reason = "Forbidden";
+		code->number = 403;
+		code->reason = "Forbidden";
 		break;
 
 	case 404:
-		error->number = 404;
-		error->reason = "Not Found";
+		code->number = 404;
+		code->reason = "Not Found";
 		break;
 
 	case 500:
-		error->number = 500;
-		error->reason = "Internal Server Error";
+		code->number = 500;
+		code->reason = "Internal Server Error";
 		break;
 
 	case 501:
-		error->number = 501;
-		error->reason = "Not Implemented";
+		code->number = 501;
+		code->reason = "Not Implemented";
 		break;
 		
 	case 502:
-		error->number = 502;
-		error->reason = "Bad Gateway";
+		code->number = 502;
+		code->reason = "Bad Gateway";
 		break;
 
 	case 503:
-		error->number = 503;
-		error->reason = "Service Unavailable";
+		code->number = 503;
+		code->reason = "Service Unavailable";
 		break;
 		
 	default:
