@@ -1,3 +1,7 @@
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -10,8 +14,8 @@
 
 //Preprocessor defines
 #define VERSION "0.5"
-#define SERVERNAME "Hermes Team 09"
-#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n"
+#define SERVERNAME "Hermes"
+#define HTTP_HEADER "HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: %s\r\nContent-Length: %li\r\n\r\n"
 #define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
 #define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
 #define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
@@ -31,10 +35,11 @@ int get_line(int sock, char *buf, int size);
 int set_code(status_code* error, int number);
 int process_Request(int socket);
 int send_File(char *filename,int socket);
-void create_header(status_code* code,char** header);
-void send_status(int statuscode, int sock);
+void create_header(status_code* code,char** header,char *type,long size);
+void send_status(int statuscode, int sock,long size);
 void usage( char *argv0 );
 void sysErr( char *msg, int exitCode );
+void send_status_css(int statuscode, int sock, char *type,long size);
 
 //Main program
 int main(int argc, char **argv)
@@ -140,7 +145,7 @@ int process_Request(int socket)
         // Check if the entire request exceeds he 8KB limit
         usedbuf=usedbuf-len;
         if (usedbuf <= 0){
-            send_status(400,socket);
+            send_status(400,socket,(long)strlen(HTTP_404));
             return 1;
         }
         printf("%s",revBuff);
@@ -166,7 +171,7 @@ int process_Request(int socket)
     }
     //if there is no get request send 501
     else{
-        send_status(501,socket);
+        send_status(501,socket,(int)strlen(HTTP_BODY));
         return 1;
     }
 
@@ -177,37 +182,78 @@ int send_File(char *filename,int socket)
 {
     // Declaration of used variables in this function
     FILE *fp;
+    int pic_fd;
     char text[201];
+    struct stat stat_buf;
     char *file;
+    long size;
     file=(char *)malloc(strlen(filename)*sizeof(char)+1);
     file[0]='.';
 
     // Check if the requested file wants to escape the designated area
     if(strstr(filename,"..")!=NULL){
-        send_status(404,socket);
-	free(file);
-	return 1;
+        send_status(404,socket,(int)strlen(HTTP_404));
+	    free(file);
+	    return 1;
     }
-
+    if(strncmp(filename,"/",1)>=0 && strlen(filename)==1){
+        strcat(file,"/index.html");
+    }
+    else{
+        strcat(file,filename);
+    }
+    
     // Change to direotory of the stored files
     chdir(HTML_FILES_PATH);
-    strcat(file,filename);
     fp = fopen(file,"r+");
 
     // Check if the requested file exists
     // If not send error
     if(fp==NULL || errno==EISDIR){
-        send_status(404,socket);
+        send_status(404,socket,(int)strlen(HTTP_404));
         free(file);
         return 1;
     }
     // Else send the requested file
     else{
-        send_status(200,socket);
-        while(fgets(text,200,fp)!=NULL){   
-            if(write( socket, text, strlen(text) ) ==-1 ){
+        fseek(fp,0,SEEK_END);
+        size=ftell(fp);
+        fseek(fp,0,SEEK_SET);
+        if(strstr(filename,"css")!=NULL){
+            send_status_css(200,socket,"text/css",size);
+            while(fgets(text,200,fp)!=NULL){   
+                if(write( socket, text, strlen(text) ) ==-1 ){
+                    sysErr("Server Fault: SENDTO", -4);
+                }
+            }
+            return 0;
+        }
+        else if(strstr(filename,"jpeg")!=NULL || strstr(filename,"png")!=NULL){
+            fclose(fp);
+            pic_fd = open(file, O_RDONLY);
+            fstat(pic_fd,&stat_buf);
+            send_status_css(200,socket,"image/*",size);
+            if(sendfile(socket,pic_fd,NULL,stat_buf.st_size) == -1 ){
                 sysErr("Server Fault: SENDTO", -4);
-		    }
+            }
+            return 0;
+        }
+        else if(strstr(filename,"js")!=NULL){
+            send_status_css(200,socket,"text/javascript",size);
+            while(fgets(text,200,fp)!=NULL){
+                if(send( socket, text, strlen(text),0 ) ==-1 ){
+                    sysErr("Server Fault: SENDTO", -4);
+                }
+            }
+            return 0;
+        }
+        else{
+            send_status(200,socket,size);
+            while(fgets(text,200,fp)!=NULL){   
+                if(write( socket, text, strlen(text) ) ==-1 ){
+                    sysErr("Server Fault: SENDTO", -4);
+                }
+            }
         }
         fclose(fp);
         free(file);
@@ -215,20 +261,42 @@ int send_File(char *filename,int socket)
     return 0;
 }
 
-void create_header(status_code* code,char** header)
+void create_header(status_code* code,char** header,char *type,long size)
 {
     //Get Size of formated header string and allocate the needed Memoryspace
-    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION)+2;
+    int len=snprintf(NULL,0,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION,type,size)+2;
     *header=(char*)malloc(len*sizeof(char));
-    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION);
+    snprintf(*header,len,HTTP_HEADER,code->number,code->reason,SERVERNAME,VERSION,type,size);
 }
 
-void send_status(int statuscode, int sock){
+void send_status(int statuscode, int sock,long size){
     // Send the corresponding error as a header
     char *header;
     status_code code;
     set_code(&code,statuscode);
-    create_header(&code,&header);
+    create_header(&code,&header,"text/html",size);
+    if(write( sock, header, strlen(header))==-1){
+        sysErr("Server Fault: SENDTO",-4);
+    }
+    // Individual pages for better visibility of the send error
+    if(statuscode ==501){
+        if(write(sock,HTTP_BODY,strlen(HTTP_BODY)) ==-1){
+            sysErr("Server Fault: SENDTO",-4);
+        }
+    }
+    if(statuscode ==404){
+        if(write(sock,HTTP_404,strlen(HTTP_404)) ==-1){
+            sysErr("Server Fault: SENDTO",-4);
+        }
+    }
+}
+
+void send_status_css(int statuscode, int sock,char *type,long size){
+    // Send the corresponding error as a header
+    char *header;
+    status_code code;
+    set_code(&code,statuscode);
+    create_header(&code,&header,type,size);
     if(write( sock, header, strlen(header))==-1){
         sysErr("Server Fault: SENDTO",-4);
     }

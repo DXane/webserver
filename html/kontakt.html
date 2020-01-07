@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kontakt</title>
+    <link rel="stylesheet" href="./css/default.css"></link>
+    <script type="text/javascript" src="./js/main.js"></script>
+    <noscript>Bitte Javascript zur Nutzung aktivieren! 
+      <style>
+        div{
+          display: none;
+        }
+      </style>
+    </noscript>
+  </head>
+  <body onload="insertessential()">
+    <div class="container-fluid">
+      <div class="row">
+        <nav></nav>
+      </div>
+      <div class="row">
+        <header class="col-md-12 col-sm-12 h1">Kontakt</header>
+      </div>
+      <div class="row" style="margin-bottom: 20px">
+        <address class="offset-2  col-md-7 col-sm-7 text-center">
+          <strong>Forrede GmbH</strong><br>
+          56788 München<br>
+          Falsche Strasse 666<br>
+          <abbr title="Telefon">Tel.:</abbr>0123456879<br>
+          Daniel Förderer<br>
+          Email: <a href="mailto:#">example@mail.de</a>
+        </address>
+        <div id='messagebox' class="d-none"><div id="message" class="col-md-12 h3 "></div><button id="msgbtn" class="btn btn-info btn-sm">Schließen</button></div>
+        <form name="kontakt" action="#" onsubmit="return kontaktformular()" class="col-md-5 offset-3">
+          <div class="form-group">
+            <label for="fvorname">Name</label>
+            <input name="fvorname" type="input" id="fvorname" class="form-control" placeholder="Name eingeben"></input>
+          </div>
+          <div class="form-group">
+            <label for="emailkontakt">Email</label>
+            <input name="femail" type="email" id="emailkontakt" class="form-control" placeholder="Emailaddresse eingeben"></input>
+          </div>
+          <div class="form-group">
+            <label for="kontaktnachricht">Nachricht</label>
+            <textarea name="ftext" class="form-control" rows="5" id="kontaktnachricht" placeholder="Ihre Nachricht hier"></textarea>
+          </div>
+          <div class="form-group" style="padding-left: 20px;">
+            <input name="fnewsletter" type="checkbox" class="form-check-input" id="newsletter" value="newsletter">
+            <label class="form-check-label" for="newsletter">Abonniere den Newsletter</label>
+          </div>
+          <button id="submit" type="submit" style="margin-bottom: 10px" class="btn btn-primary">Senden</button>
+        </form>
+      </div>
+      
+      <div class="row">
+          <footer></footer>
+      </div>
+      
+	  </div>
+  </body>
+</html>

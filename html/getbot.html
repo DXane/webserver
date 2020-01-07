@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Invite</title>
+    <link rel="stylesheet" href="./css/default.css"></link>
+    <script type="text/javascript" src="./js/main.js"></script>
+    <noscript>
+      Bitte Javascript zur Nutzung aktivieren!
+      <style>
+          div{
+            display: none;
+          }
+        </style>
+    </noscript>
+  </head>
+  <body onload="insertessential();">
+    <div class="container-fluid">
+      <div class="row">
+        <nav></nav>
+      </div>
+      <div class="row">
+        <header class="col-md-12 col-sm-12 h1">Get the Bot</header>
+        
+        <article class="col-md-6 col-sm-6 h3 text-capitalize text-center invitepanel" id="discinv"> Discord</article>
+        <article class="col-md-6 col-sm-6 h3 text-capitalize text-center invitepanel" id="gitinv"> Github </article>
+        
+        <section class="col-md-12 col-sm-12 d-none" id="hubinvite">
+          <p>
+            <h3>
+              1.)
+            </h3>
+            Lade die bot <a onclick="alert('Der Bot ist noch nicht öffentlich')" href="#">.jar von der Release-Seite auf Github</a> runter und starte sie den Bot durch den Befehl <kbd>java -jar <code>packagename</code>.jar</kbd>.
+            <br>Vor dem Start fügt in <code>bot.config</code> den API-Token von Discord ein. Ansonsten beendet sich der Bot sofort.
+            <br><h3>2.)</h3>
+            Beim ersten Starten des Bots erstellt er einen Ordner namens <code>wdatabase</code>. Ihn diesem Ordner wird die h2-Datenbank angelegt auf der Alle Charaktere eingespeichert werden.
+            <br>In der Repository befindet sich eine Sampledatenbank die man Nutzen kann. <del>Charaktere konnen nach der Bot zuweisung über den Befehl <kbd>$add</kbd> hinzugefügt werden</del>. <b>Der Befehl wurde noch nicht implementiert.</b>
+          </p>  
+        </section>
+        <section class="col-md-12 col-sm-12 d-none" id="discordinvite">
+          <h1>Hier könnte ihr Invite stehen!!</h1>
+          <small>Da der Bot zurzeit nicht für andere Server gedacht ist, gibt es keinen invite Link für Discord. Nutze bitte die Github alternative.</small>
+        </section>
+        <footer></footer>
+      </div>
+      
+	  </div>
+  </body>
+</html>

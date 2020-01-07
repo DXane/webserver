@@ -1,0 +1,125 @@
+body{
+    background-image: url(../img/bg.png);
+    color: white;
+}
+header{
+    height: 250px;
+    padding: 100px;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+nav {
+    background-color: dimgray;
+    opacity: 0.8;
+    display: flex;
+    color: white;
+    text-align: center;
+    height: 70px;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.navitem{
+    background-color: dimgray;
+    flex: auto;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+.navitem:any-link{
+    color: #FFF;
+}
+
+.navitem:hover{
+    opacity: 1.0;
+    background-color: aliceblue;
+    color: black;
+}
+
+section {
+    color: black;
+    background-color: rgba(0, 200, 200, 0.8);
+}
+
+.logo{
+    -webkit-clip-path: circle(30% at 50% 200%);
+    clip-path: circle(30% at 50% 20%);
+}
+
+.navlogo{
+    height: 70px;
+}
+
+#git:hover{
+    -webkit-filter: invert(1);
+    filter: invert(1);
+}
+
+#logo{
+    margin-top: 38px; 
+    transform: scale(2.0);
+}
+
+article:nth-of-type(1){
+    background-color: blue;
+}
+
+article:nth-of-type(2){
+    background-color: green;
+}
+
+footer{
+    background-color: darkslategray;
+    padding: 10px;
+    color: black;
+}
+
+a{
+    color: #000;
+}
+
+p{
+    background-color: grey;
+}
+
+form{
+    background-color: rgba(105, 105, 105, 0.8);
+}
+
+address{
+    background-color: rgba(150,150,150, 0.8);
+}
+
+#messagebox{
+    background-color: rgba(0, 200, 0, 0.8);
+    color: #000;
+}
+
+#hubinvite{
+    background-color: lightgreen;
+}
+
+#discordinvite{
+    background-color: aqua;
+}
+
+#discinv:hover{
+    background-color: aqua;
+}
+
+#gitinv:hover{
+    background-color: greenyellow;
+}
+
+table{
+    color: black;   
+}
+
+.invitepanel{
+    height: 80px;
+    padding-top: 20px;
+    margin-bottom: -10px;
+}
+
+#index{
+    background-color: grey;
+}

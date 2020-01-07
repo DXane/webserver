@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Command</title>
+    <link rel="stylesheet" href="./css/default.css"></link>
+    <script type="text/javascript" src="./js/main.js"></script>
+    <noscript>
+      Bitte Javascript zur Nutzung aktivieren!
+      <style>
+          div{
+            display: none;
+          }
+        </style>
+    </noscript>
+  </head>
+  <body onload="insertessential()">
+    <div class="container-fluid">
+    <div class="row">
+      <nav>
+      </nav>
+    
+      <header class="col-md-12 col-sm-12 h1">Command</header>
+      
+      <table name="toggletabelle" class="table-responsive table">
+        <thead>
+          <tr>
+            <th class="table-dark">Filter</th>
+          </tr>
+          <tr>
+            <th class="table-danger" scope="col"><input id="filterowner" onchange="toggle('owner')" type="checkbox" checked> Owner</th>
+            <th class="table-warning" scope="col"><input id="filteradmin" onclick="toggle('admin')" type="checkbox" checked> Admin  </th>
+            <th class="table-info" scope="col"><input id="filtermoderrator" onclick="toggle('moderrator')" type="checkbox" checked> Moderrator</th>
+            <th class="table-success" scope="col"><input id="filtereveryone" onclick="toggle('everyone')" type="checkbox" checked> Jeder</th>
+          </tr>
+        </thead>
+      </table>
+
+      <div class="table-responsive">
+        <table name="befehletabelle" class="table table-light table-striped">
+          <thead class="thead-dark">
+            <th scope="col">Befehl</th>
+            <th scope="col">Beschreibung</th>
+            <th scope="col">Beispiele</th>
+            <th scope="col">Benötigte min. Berechtigungen</th>
+          </thead>
+          <tbody name="table-body">
+            <tr class="table-danger owner">
+              <th scope="row">$set</th>
+              <td>Setzt den Textchannel in dem gerollt werden soll. Wenn keine Id übergeben wird, wird der aktuelle Channel genommen.</td>
+              <td>$get <i>channelid</i>  <br> $get</td>
+              <td>Owner</td>
+            </tr>
+            <tr class="table-danger owner">
+                <th scope="row">$reset</th>
+                <td>Setzt die Datenbank für den Server zurück</td>
+                <td>$reset</td>
+                <td>Owner</td>
+            </tr>
+            <tr class="table-info moderrator">
+                <th scope="row">$settime</th>
+                <td>Setzt den Resettimer auf die gewählte Uhrzeit</td>
+                <td>$settime 12:00 <br> $settime 09:55 <br> $st 08:36</td>
+                <td>Moderrator</td>
+            </tr>
+            <tr class="table-warning admin">
+                <th scope="row">$snap</th>
+                <td>Setzt zufällig die Hälfte aller Claims der Spieler zurück <br> Kann auch auf bestimmte Spieler gesetzt werden</td>
+                <td>$snap <br> $snap <i>@mention</i></td>
+                <td>Admin</td>
+            </tr>
+            <tr class="table-success everyone">
+                <th scope="row">$info</th>
+                <td>Gibt aktuelle Information zum Bot aus</td>
+                <td>$info <br> $i </td>
+                <td>Jeder</td>
+            </tr>
+            <tr class="table-success everyone">
+                <th scope="row">$myinfo</th>
+                <td>Gibt Informationen zum Nutzer aus, wie Anzahl Claims, letzter Claim und eine Liste aller Claims </td>
+                <td>$myinfo <br> $mi <br> $mi <i>@mention</i> <br>$myinfo <i>@mention</i></td>
+                <td>Jeder</td>
+            </tr>
+            <tr class="table-success everyone">
+                <th scope="row">$nextclaim</th>
+                <td>Gibt die Zeit bis zum nächsten Claim an</td>
+                <td>$nextclaim <br> $nc </td>
+                <td>Jeder</td>
+            </tr>
+            <tr class="table-success everyone">
+                <th scope="row">$give</th>
+                <td>Gebe einen Spieler einen Charakter</td>
+                <td>$give <i>@mention Charaktername</i> <br> $g <i>@mention Charaktername</i> </td>
+                <td>Jeder</td>
+            </tr>
+            <tr class="table-success everyone">
+                <th scope="row">$exchange</th>
+                <td>Tausche Charaktere mit einem anderen Spieler aus</td>
+                <td>$exchange <i>@mention Charaktername</i> <br> $e <i>@mention Charaktername</i> </td>
+                <td>Jeder</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer>
+      </footer>
+    
+    
+    </div>
+  </div>
+  </body>
+</html>
