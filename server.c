@@ -12,11 +12,10 @@
 #include <stdbool.h>
 
 //Preprocessor defines
-#define VERSION "0.5"
+#define VERSION "1.0"
 #define SERVERNAME "Hermes Team 09"
-#define HTTP_BODY "<html><body><b>501</b> Not Implemented </body></html>\r\n"
-#define HTTP_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
-#define HTTP_OK "<html><body>Dies ist die eine Fake Seite des Webservers!</body></html>\r\n"
+#define HTTP_BODY_501 "<html><body><h1>501</h1> Not Implemented </body></html>\r\n"
+#define HTTP_BODY_404 "<html><body><h1>404</h1> Not Found </body></html>\r\n"
 #define HTML_FILES_PATH "./html/"
 
 //Maximum possible size for a single request line
@@ -53,7 +52,7 @@ int main(int argc, char **argv)
 
     // Check for right number of arguments
 	if ( argc < 2 ) usage( argv[0] );
-    printf("Build %s Date: %s %s\n",VERSION,__DATE__,__TIME__);
+    printf("Build %s Compiled at Date: %s %s\n",VERSION,__DATE__,__TIME__);
 
 	// Setup of the Socket for TCP Communication
 	sockfd = socket(AF_INET,SOCK_STREAM,0);
@@ -95,8 +94,9 @@ int main(int argc, char **argv)
         //Child process executes the requested connection code so the main process can accept the next request
         if(id==-1){
             sysErr("Fork failed",-5);
-        }
+        }//Child Process
         else if(id==0){
+            //Check if the Connection is valid. If valid Process the Request
             if (connfd < 0){
                 sysErr("Server accept failed",-1);
             }
@@ -106,12 +106,12 @@ int main(int argc, char **argv)
                 // Processing the current request
                 process_Request(connfd);
             }
-            // Close conection
+            // Close conection and exit Child Process
             printf("Close Connection\n");
             close(connfd);
             exit(0);
         }
-        //Parent close connection
+        //Parent close connection and wait for other connections
         close(connfd);
 	}
     //Close the opened socket
@@ -120,17 +120,18 @@ int main(int argc, char **argv)
 }
 
 //Function Implementations
+//
 int process_Request(int socket)
 {
     // Declaration of used variables in this function
-    size_t len;
-    int line;
-    char revBuff[BUF_LEN];
-    char delimiter[2]=" ";
-    char *token;
-    int usedbuf;
-    int flag;
-    char reqfile[100];
+    size_t len; //Length of a Request Line
+    int line;   //Number of Lines read from the Request
+    char revBuff[BUF_LEN]; //Buffer for the Request Line
+    char delimiter[2]=" "; //Delimiter for token
+    char *token;    //Pointer for token
+    int usedbuf;    //Max Size of Request
+    int flag;       //Flag if Request is valid
+    char reqfile[100]; //String for the File that will be requested
     
     usedbuf=8192-1;
     line=0;
@@ -156,7 +157,8 @@ int process_Request(int socket)
             if( strncmp( token , "GET" , 3 ) == 0 ) {
                 token=strtok(NULL,delimiter);
                 flag=1;
-                strncpy(reqfile,token,strlen(token));
+                //Save Filename for later
+                strncpy(reqfile,token,100);
             }
             line++;
         }
@@ -165,6 +167,7 @@ int process_Request(int socket)
 
     // Start function to send the requested file to the client
     if(flag==1){
+        printf("%s",reqfile);
         send_File(reqfile,socket);
     }
     //if there is no get request send 501
@@ -175,21 +178,21 @@ int process_Request(int socket)
 
     return 0;
 }
-
+//Send the given File over the Socket
 int send_File(char *filename,int socket)
 {
     // Declaration of used variables in this function
     FILE *fp;
     char text[201];
-    char *file;
+    char *file;//Compatible Filename 
     file=(char *)malloc(strlen(filename)*sizeof(char)+1);
     file[0]='.';
 
     // Check if the requested file wants to escape the designated area
     if(strstr(filename,"/../")!=NULL){
         send_status(404,socket);
-	free(file);
-	return 1;
+	    free(file);
+	    return 1;
     }
 
     // Change to the directory of html stored files
@@ -202,6 +205,7 @@ int send_File(char *filename,int socket)
     if(fp==NULL || errno==EISDIR){
         send_status(404,socket);
         free(file);
+        printf("File error");
         return 1;
     }
     // Else send the requested file
@@ -212,7 +216,7 @@ int send_File(char *filename,int socket)
                 sysErr("Server Fault: SENDTO", -4);
 		    }
         }
-        //Close the opened file
+        //Close the opened file and free the used Memory
         fclose(fp);
         free(file);
     }
@@ -222,28 +226,30 @@ int send_File(char *filename,int socket)
 void create_header(status_code* code,char** header)
 {
     //Get Size of formated header string and allocate the needed Memoryspace
-    int len=snprintf(NULL,0,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION)+2;
+    int len=snprintf(NULL,0,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION)+2;
     *header=(char*)malloc(len*sizeof(char));
-    snprintf(*header,len,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nConnection: close\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION);
+    snprintf(*header,len,"HTTP/1.0 %i %s\r\nServer: %s/%s\r\nContent-type: text/html\r\n\r\n",code->number,code->reason,SERVERNAME,VERSION);
 }
 
 void send_status(int statuscode, int sock){
-    // Send the corresponding error as a header
+    // Send the corresponding Status as a header
     char *header;
     status_code code;
+
     set_code(&code,statuscode);
     create_header(&code,&header);
+    //Send Header
     if(write( sock, header, strlen(header))==-1){
         sysErr("Server Fault: SENDTO",-4);
     }
     // Individual pages for better visibility of the send error
-    if(statuscode ==501){
-        if(write(sock,HTTP_BODY,strlen(HTTP_BODY)) ==-1){
+    if(statuscode == 501){
+        if(write(sock,HTTP_BODY_501,strlen(HTTP_BODY_501)) ==-1){
             sysErr("Server Fault: SENDTO",-4);
         }
     }
-    if(statuscode ==404){
-        if(write(sock,HTTP_404,strlen(HTTP_404)) ==-1){
+    if(statuscode == 404){
+        if(write(sock,HTTP_BODY_404,strlen(HTTP_BODY_404)) ==-1){
             sysErr("Server Fault: SENDTO",-4);
         }
     }
@@ -294,6 +300,7 @@ void sysErr( char *msg, int exitCode )
 	fprintf( stderr, "%s\n\t%s\n", msg, strerror( errno ) );
 	exit( exitCode );
 }
+
 //Setup for filling the HTTP Response codes with corresponding values
 int set_code(status_code* code, int number)
 {
